@@ -1,14 +1,15 @@
 from fastapi import APIRouter, Request, Form
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
+import os
 import requests
 from app.core.ui_auth import require_ui_user
 
 router = APIRouter(prefix="/ui")
 templates = Jinja2Templates(directory="app/templates")
 
-API_BASE = "http://127.0.0.1:8000"
-
+# ✅ FIXED: Use environment variable for production compatibility
+API_BASE = os.getenv("API_BASE_URL", "http://127.0.0.1:8000")
 
 @router.get("/login")
 def login_page(request: Request):
@@ -16,7 +17,6 @@ def login_page(request: Request):
         "auth/login.html",
         {"request": request}
     )
-
 
 @router.post("/login")
 def login_action(
@@ -53,7 +53,6 @@ def login_action(
     )
     return response
 
-
 @router.get("/register")
 def register_page(request: Request):
     return templates.TemplateResponse(
@@ -61,8 +60,7 @@ def register_page(request: Request):
         {"request": request}
     )
 
-
-@router.post("/register")
+# ✅ FIXED: Remove duplicate @router.post decorator
 @router.post("/register")
 def register_action(
     request: Request,
@@ -88,9 +86,6 @@ def register_action(
         )
 
     return RedirectResponse("/ui/login", status_code=302)
-
-
-
 
 @router.get("/categories")
 def category_list(
@@ -127,19 +122,15 @@ def category_list(
         }
     )
 
-
-
 @router.post("/categories/add")
 def add_category(
     request: Request,
     name: str = Form(...)
 ):
-    # 🔐 protect page
     auth = require_ui_user(request)
     if auth:
         return auth
 
-    # ❗ STRICT cookie read (do not use .get)
     token = request.cookies["access_token"]
 
     resp = requests.post(
@@ -152,7 +143,6 @@ def add_category(
         timeout=5
     )
 
-    # 🔴 TEMP DEBUG (REMOVE LATER)
     if resp.status_code != 201:
         print("ADD CATEGORY FAILED")
         print("STATUS:", resp.status_code)
@@ -205,10 +195,7 @@ def update_category(
 
     return RedirectResponse("/ui/categories", status_code=302)
 
-
-# -------------------------
 # SUPPLIERS UI
-# -------------------------
 @router.get("/suppliers")
 def supplier_list(request: Request, search: str | None = None):
     auth = require_ui_user(request)
@@ -222,7 +209,8 @@ def supplier_list(request: Request, search: str | None = None):
     resp = requests.get(
         f"{API_BASE}/api/suppliers",
         params=params,
-        headers={"Authorization": f"Bearer {token}"}
+        headers={"Authorization": f"Bearer {token}"},
+        timeout=5
     )
 
     suppliers = resp.json() if resp.status_code == 200 else []
@@ -236,7 +224,6 @@ def supplier_list(request: Request, search: str | None = None):
         }
     )
 
-
 @router.post("/suppliers/add")
 def add_supplier(request: Request, name: str = Form(...)):
     auth = require_ui_user(request)
@@ -248,11 +235,11 @@ def add_supplier(request: Request, name: str = Form(...)):
     requests.post(
         f"{API_BASE}/api/suppliers",
         json={"name": name},
-        headers={"Authorization": f"Bearer {token}"}
+        headers={"Authorization": f"Bearer {token}"},
+        timeout=5
     )
 
     return RedirectResponse("/ui/suppliers", status_code=302)
-
 
 @router.post("/suppliers/update/{supplier_id}")
 def update_supplier(
@@ -269,11 +256,11 @@ def update_supplier(
     requests.put(
         f"{API_BASE}/api/suppliers/{supplier_id}",
         json={"name": name},
-        headers={"Authorization": f"Bearer {token}"}
+        headers={"Authorization": f"Bearer {token}"},
+        timeout=5
     )
 
     return RedirectResponse("/ui/suppliers", status_code=302)
-
 
 @router.post("/suppliers/delete/{supplier_id}")
 def delete_supplier(request: Request, supplier_id: int):
@@ -285,11 +272,11 @@ def delete_supplier(request: Request, supplier_id: int):
 
     requests.delete(
         f"{API_BASE}/api/suppliers/{supplier_id}",
-        headers={"Authorization": f"Bearer {token}"}
+        headers={"Authorization": f"Bearer {token}"},
+        timeout=5
     )
 
     return RedirectResponse("/ui/suppliers", status_code=302)
-
 
 @router.get("/products")
 def product_list(
@@ -303,6 +290,8 @@ def product_list(
         return auth
 
     token = request.cookies.get("access_token")
+    if not token:
+        return RedirectResponse("/ui/login", status_code=302)
 
     params = {}
     if search:
@@ -350,7 +339,6 @@ def product_list(
     except Exception:
         pass
 
-    # ✅ ALWAYS RETURN TEMPLATE
     return templates.TemplateResponse(
         "product/list.html",
         {
@@ -397,7 +385,8 @@ def add_product(
         headers={
             "Authorization": f"Bearer {token}",
             "Content-Type": "application/json"
-        }
+        },
+        timeout=5
     )
 
     if resp.status_code not in (200, 201):
@@ -422,6 +411,8 @@ def update_product(
         return auth
 
     token = request.cookies["access_token"]
+    if not token:
+        return RedirectResponse("/ui/login", status_code=302)
 
     payload = {
         "name": name,
@@ -438,7 +429,8 @@ def update_product(
         headers={
             "Authorization": f"Bearer {token}",
             "Content-Type": "application/json"
-        }
+        },
+        timeout=5
     )
 
     if resp.status_code != 200:
@@ -447,7 +439,6 @@ def update_product(
 
     return RedirectResponse("/ui/products", status_code=302)
 
-
 @router.post("/products/delete/{product_id}")
 def delete_product(request: Request, product_id: int):
     auth = require_ui_user(request)
@@ -455,18 +446,18 @@ def delete_product(request: Request, product_id: int):
         return auth
 
     token = request.cookies["access_token"]
+    if not token:
+        return RedirectResponse("/ui/login", status_code=302)
 
     requests.delete(
         f"{API_BASE}/api/products/{product_id}",
-        headers={"Authorization": f"Bearer {token}"}
+        headers={"Authorization": f"Bearer {token}"},
+        timeout=5
     )
 
     return RedirectResponse("/ui/products", status_code=302)
 
-
-# =========================
 # SALES LIST PAGE
-# =========================
 @router.get("/sales")
 def sales_list(request: Request):
     auth = require_ui_user(request)
@@ -474,8 +465,10 @@ def sales_list(request: Request):
         return auth
 
     token = request.cookies.get("access_token")
+    if not token:
+        return RedirectResponse("/ui/login", status_code=302)
 
-    # ---- Fetch products ----
+    # Fetch products
     products_resp = requests.get(
         f"{API_BASE}/api/products",
         headers={"Authorization": f"Bearer {token}"},
@@ -483,7 +476,7 @@ def sales_list(request: Request):
     )
     products = products_resp.json() if products_resp.status_code == 200 else []
 
-    # ---- Fetch sales ----
+    # Fetch sales
     sales_resp = requests.get(
         f"{API_BASE}/api/sales",
         headers={"Authorization": f"Bearer {token}"},
@@ -491,17 +484,15 @@ def sales_list(request: Request):
     )
     sales = sales_resp.json() if sales_resp.status_code == 200 else []
 
-    # ---- Build product map ----
+    # Build product map
     product_map = {p["id"]: p for p in products}
 
-    # ---- Enrich sales (SAFE) ----
+    # Enrich sales
     enriched_sales = []
     for s in sales:
         product = product_map.get(s["product_id"])
-
         s["product_name"] = product["name"] if product else "—"
         s["product_price"] = product["price"] if product else 0
-
         enriched_sales.append(s)
 
     return templates.TemplateResponse(
@@ -513,10 +504,6 @@ def sales_list(request: Request):
         }
     )
 
-
-# =========================
-# ADD SALE
-# =========================
 @router.post("/sales/add")
 def sales_add(
     request: Request,
@@ -528,6 +515,8 @@ def sales_add(
         return auth
 
     token = request.cookies.get("access_token")
+    if not token:
+        return RedirectResponse("/ui/login", status_code=302)
 
     requests.post(
         f"{API_BASE}/api/sales",
@@ -541,10 +530,6 @@ def sales_add(
 
     return RedirectResponse("/ui/sales", status_code=302)
 
-
-# =========================
-# UPDATE SALE
-# =========================
 @router.post("/sales/update/{sale_id}")
 def sales_update(
     request: Request,
@@ -557,6 +542,8 @@ def sales_update(
         return auth
 
     token = request.cookies.get("access_token")
+    if not token:
+        return RedirectResponse("/ui/login", status_code=302)
 
     resp = requests.put(
         f"{API_BASE}/api/sales/{sale_id}",
@@ -573,10 +560,6 @@ def sales_update(
 
     return RedirectResponse("/ui/sales", status_code=302)
 
-
-# =========================
-# DELETE SALE
-# =========================
 @router.post("/sales/delete/{sale_id}")
 def sales_delete(request: Request, sale_id: int):
     auth = require_ui_user(request)
@@ -584,6 +567,8 @@ def sales_delete(request: Request, sale_id: int):
         return auth
 
     token = request.cookies.get("access_token")
+    if not token:
+        return RedirectResponse("/ui/login", status_code=302)
 
     requests.delete(
         f"{API_BASE}/api/sales/{sale_id}",
@@ -592,10 +577,3 @@ def sales_delete(request: Request, sale_id: int):
     )
 
     return RedirectResponse("/ui/sales", status_code=302)
-
-
-
-
-
-
-  
