@@ -410,3 +410,67 @@ th {
     margin-bottom: 15px;
 }
 
+.card {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+}
+.table-wrapper {
+    padding: 0;
+}
+
+.table-scroll {
+    max-height: 65vh;          
+    overflow: auto;            
+    width: 100%;
+}
+
+
+.data-table {
+    width: 100%;
+    min-width: 1100px;         
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+
+/* header */
+.data-table thead th {
+    position: sticky;
+    top: 0;
+    background: #f1f5f9;
+    z-index: 2;
+}
+
+
+.data-table th,
+.data-table td {
+    padding: 10px;
+    border-bottom: 1px solid #e5e7eb;
+    white-space: nowrap; 
+    text-align: center;
+    vertical-align: middle;      
+}
+
+
+.data-table input,
+.data-table select {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 6px;
+    font-size: 13px;
+    text-align: center;
+}
+
+
+.data-table td:last-child {
+    display: flex;
+    gap: 6px;
+    justify-content: center;
+    align-items: center;
+}
+
+
+
+
+

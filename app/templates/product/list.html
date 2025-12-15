@@ -63,9 +63,11 @@
 </form>
 </div>
 
-<!-- 📋 PRODUCT TABLE -->
-<div class="card">
-<table>
+
+<div class="card table-wrapper">
+    <div class="table-scroll">
+        <table class="data-table">
+
 <thead>
 <tr>
     <th>ID</th>
@@ -82,7 +84,6 @@
 <tbody>
 {% for p in products %}
 <tr>
-    <!-- UPDATE FORM (INSIDE TD – VALID) -->
     <form method="post" action="/ui/products/update/{{ p.id }}">
         <td>{{ p.id }}</td>
 
@@ -130,6 +131,7 @@
 {% endfor %}
 </tbody>
 </table>
+</div>
 </div>
 
 {% endblock %}

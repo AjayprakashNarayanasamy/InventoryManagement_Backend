@@ -8,7 +8,6 @@ from app.core.ui_auth import require_ui_user
 router = APIRouter(prefix="/ui")
 templates = Jinja2Templates(directory="app/templates")
 
-# ✅ FIXED: Use environment variable for production compatibility
 API_BASE = os.getenv("API_BASE_URL", "http://127.0.0.1:8000")
 
 @router.get("/login")
@@ -60,7 +59,6 @@ def register_page(request: Request):
         {"request": request}
     )
 
-# ✅ FIXED: Remove duplicate @router.post decorator
 @router.post("/register")
 def register_action(
     request: Request,
@@ -195,7 +193,6 @@ def update_category(
 
     return RedirectResponse("/ui/categories", status_code=302)
 
-# SUPPLIERS UI
 @router.get("/suppliers")
 def supplier_list(request: Request, search: str | None = None):
     auth = require_ui_user(request)
@@ -577,3 +574,81 @@ def sales_delete(request: Request, sale_id: int):
     )
 
     return RedirectResponse("/ui/sales", status_code=302)
+
+
+@router.get("/dashboard")
+def dashboard(request: Request):
+    auth = require_ui_user(request)
+    if auth:
+        return auth
+
+    token = request.cookies.get("access_token")
+
+    import pandas as pd
+    import requests
+
+    products = requests.get(
+        f"{API_BASE}/api/products",
+        headers={"Authorization": f"Bearer {token}"}
+    ).json()
+
+    sales = requests.get(
+        f"{API_BASE}/api/sales",
+        headers={"Authorization": f"Bearer {token}"}
+    ).json()
+
+    # -------------------------------
+    # Pandas Reports
+    # -------------------------------
+    df_products = pd.DataFrame(products)
+    df_sales = pd.DataFrame(sales)
+
+    if df_products.empty:
+        df_products = pd.DataFrame(columns=["id", "name", "price", "quantity"])
+
+    if df_sales.empty:
+        df_sales = pd.DataFrame(columns=["product_id", "quantity_sold"])
+
+    df_products["price"] = df_products["price"].astype(int)
+    df_products["quantity"] = df_products["quantity"].astype(int)
+    df_sales["quantity_sold"] = df_sales["quantity_sold"].astype(int)
+
+    # Merge sales + products
+    df = pd.merge(
+        df_sales,
+        df_products,
+        left_on="product_id",
+        right_on="id",
+        how="left"
+    )
+
+    df["revenue"] = df["price"] * df["quantity_sold"]
+    df = df.fillna(0)
+
+    # KPI Metrics
+    total_products = len(df_products)
+    total_stock = int(df_products["quantity"].sum())
+    total_sales = int(df_sales["quantity_sold"].sum())
+    total_revenue = int(df["revenue"].sum())
+
+    # Report 1: Top Selling Products
+    top_products = (
+        df.groupby("name", as_index=False)["quantity_sold"]
+        .sum()
+        .sort_values(by="quantity_sold", ascending=False)
+        .head(5)
+        .to_dict(orient="records")
+    )
+
+
+    return templates.TemplateResponse(
+        "dashboard/list.html",
+        {
+            "request": request,
+            "total_products": total_products,
+            "total_stock": total_stock,
+            "total_sales": total_sales,
+            "total_revenue": total_revenue,
+            "top_products": top_products,
+        }
+    )
